@@ -32,6 +32,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /services - Dịch vụ đang chạy
 /tailscale - Trạng thái Tailscale
 /gpu - Thông tin GPU
+/ddns - Cập nhật DDNS manual
 /help - Hiển thị trợ giúp
     """
     
@@ -202,6 +203,36 @@ async def gpu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Error getting GPU info: {str(e)}")
 
+async def ddns(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Update DDNS manually"""
+    if update.effective_user.id != ALLOWED_CHAT_ID:
+        return
+    
+    await update.message.reply_text("🔄 **Đang cập nhật DDNS...**")
+    
+    try:
+        # Force update DDNS using ddclient
+        result = subprocess.run(["sudo", "ddclient", "-force", "-verbose"], 
+                              capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            # Get current public IP for confirmation
+            try:
+                import requests
+                public_ip = requests.get('https://api.ipify.org', timeout=5).text
+                message = f"✅ **DDNS cập nhật thành công!**\n\n🌍 **Public IP hiện tại:** `{public_ip}`\n\n📝 **Chi tiết:**\n```\n{result.stdout}\n```"
+            except:
+                message = f"✅ **DDNS cập nhật thành công!**\n\n📝 **Chi tiết:**\n```\n{result.stdout}\n```"
+        else:
+            message = f"❌ **Lỗi cập nhật DDNS:**\n```\n{result.stderr}\n```"
+            
+        await update.message.reply_text(message, parse_mode='Markdown')
+        
+    except subprocess.TimeoutExpired:
+        await update.message.reply_text("⏰ **Timeout:** Quá trình cập nhật DDNS mất quá nhiều thời gian")
+    except Exception as e:
+        await update.message.reply_text(f"❌ **Lỗi:** {str(e)}")
+
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show help message"""
     if update.effective_user.id != ALLOWED_CHAT_ID:
@@ -222,6 +253,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔧 `/services` - Danh sách dịch vụ đang chạy
 🔗 `/tailscale` - Trạng thái Tailscale VPN
 🎮 `/gpu` - Thông tin GPU
+🌐 `/ddns` - Cập nhật DDNS manual
 ❓ `/help` - Hiển thị trợ giúp này
 
 💡 **Lưu ý:** Bot này chỉ xử lý các lệnh hệ thống. Để chat AI, hãy sử dụng FRYDAY bot!
@@ -264,6 +296,7 @@ app.add_handler(CommandHandler("disk", disk))
 app.add_handler(CommandHandler("services", services))
 app.add_handler(CommandHandler("tailscale", tailscale))
 app.add_handler(CommandHandler("gpu", gpu))
+app.add_handler(CommandHandler("ddns", ddns))
 app.add_handler(CommandHandler("help", help_cmd))
 
 # Handle regular text messages with FRYDAY AI
